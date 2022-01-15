@@ -58,7 +58,14 @@ example(of: "Create a phone number lookup") {
   
   let input = PassthroughSubject<String, Never>()
   
-  <#Add your code here#>
+    input
+        .map(convert(phoneNumber:))
+        .replaceNil(with: 0)
+        .collect(10)
+        .map(format(digits:))
+        .map(dial(phoneNumber:))
+        .sink(receiveValue: { print($0) })
+        .store(in: &subscriptions)
   
   "0!1234567".forEach {
     input.send(String($0))
