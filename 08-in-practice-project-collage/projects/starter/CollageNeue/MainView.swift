@@ -58,6 +58,7 @@ struct MainView: View {
         
         Button(action: {
           model.add()
+          isDisplayingPhotoPicker = true
         }, label: {
           Text("＋").font(.title)
         })
@@ -66,7 +67,7 @@ struct MainView: View {
       .padding(.bottom)
       .padding(.bottom)
       
-      Image(uiImage: UIImage())
+      Image(uiImage: model.imagePreview ?? UIImage())
         .resizable()
         .frame(height: 200, alignment: .center)
         .border(Color.gray, width: 2)
@@ -101,6 +102,7 @@ struct MainView: View {
       PhotosView().environmentObject(model)
     }
     .onAppear(perform: model.bindMainView)
+    .onReceive(model.updateUISubject, perform: updateUI(photosCount:))
   }
   
   func updateUI(photosCount: Int) {

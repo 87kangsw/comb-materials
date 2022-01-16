@@ -28,6 +28,7 @@
 
 import UIKit
 import Photos
+import Combine
 
 class CollageNeueModel: ObservableObject {
   static let collageSize = CGSize(width: UIScreen.main.bounds.width, height: 200)
@@ -36,21 +37,71 @@ class CollageNeueModel: ObservableObject {
   
   private(set) var lastSavedPhotoID = ""
   private(set) var lastErrorMessage = ""
-
+  private var subscriptions = Set<AnyCancellable>()
+  private let images = CurrentValueSubject<[UIImage], Never>([])
+  let updateUISubject = PassthroughSubject<Int, Never>()
+  @Published var imagePreview: UIImage?
+  private(set) var selectedPhotosSubject = PassthroughSubject<UIImage, Never>()
+  
+  
   func bindMainView() {
-    
+    images
+      .handleEvents(receiveOutput: { [weak self] photos in
+        self?.updateUISubject.send(photos.count)
+      })
+      .map { photos in
+        UIImage.collage(images: photos, size: Self.collageSize)
+      }
+      .assign(to: &$imagePreview)
   }
 
   func add() {
+    selectedPhotosSubject = PassthroughSubject<UIImage, Never>()
+    /*
+    let newPhotos = selectedPhotosSubject.share()
     
+    newPhotos
+      .map { [unowned self] newImage in
+        return self.images.value + [newImage]
+      }
+      .assign(to: \.value, on: images)
+      .store(in: &subscriptions)
+     */
+    
+    let newPhotos = selectedPhotosSubject
+      .prefix(while: { [unowned self] _ in
+        self.images.value.count < 6
+      })
+      .share()
+    
+    newPhotos
+      .map { [unowned self] newImage in
+        return self.images.value + [newImage]
+      }
+      .assign(to: \.value, on: images)
+      .store(in: &subscriptions)
   }
 
   func clear() {
-    
+    images.send([])
   }
 
   func save() {
+    guard let image = imagePreview else { return }
     
+    PhotoWriter.save(image)
+      .sink { [unowned self] result in
+        switch result {
+        case .failure(let error):
+          lastErrorMessage = error.localizedDescription
+          clear()
+        case .finished:
+          clear()
+        }
+      } receiveValue: { [unowned self] assetID in
+        lastSavedPhotoID = assetID
+      }
+      .store(in: &subscriptions)
   }
   
   // MARK: -  Displaying photos picker
@@ -93,7 +144,7 @@ class CollageNeueModel: ObservableObject {
         return
       }
       
-      // Send the selected image
+      self.selectedPhotosSubject.send(image)
     }
   }
 }
