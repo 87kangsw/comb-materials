@@ -2,7 +2,42 @@ import Combine
 import SwiftUI
 import PlaygroundSupport
 
-<# Add your code here #>
+var bag = Set<AnyCancellable>()
+
+let valuesPerSecond = 1.0
+let delayInSeconds = 1.5
+
+let sourcePublisher = PassthroughSubject<Date, Never>()
+
+let delayedPublisher = sourcePublisher.delay(for: .seconds(delayInSeconds), scheduler: DispatchQueue.main)
+
+let subscription = Timer
+    .publish(every: 1.0 / valuesPerSecond, on: .main, in: .common)
+    .autoconnect()
+    .subscribe(sourcePublisher)
+
+let sourceTimeLine = TimelineView(title: "Emitted values \(valuesPerSecond) per sec.):")
+
+let delayedTimeLine = TimelineView(title: "Delayed values \(delayInSeconds)s delay):")
+
+let view = VStack(spacing: 50.0) {
+    sourceTimeLine
+    delayedTimeLine
+}
+
+PlaygroundPage.current.liveView = UIHostingController(rootView: view.frame(width: 375.0, height: 600))
+
+sourcePublisher.displayEvents(in: sourceTimeLine)
+delayedPublisher.displayEvents(in: delayedTimeLine)
+
+sourcePublisher
+    .sink(receiveValue: { print("sourcePublisher:: \($0)") })
+    .store(in: &bag)
+
+delayedPublisher
+    .sink(receiveValue: { print("delayedPublisher:: \($0)") })
+    .store(in: &bag)
+
 
 //: [Next](@next)
 /*:
