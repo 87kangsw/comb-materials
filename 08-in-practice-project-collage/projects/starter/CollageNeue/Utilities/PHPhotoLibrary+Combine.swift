@@ -32,6 +32,14 @@ import Combine
 
 extension PHPhotoLibrary {
 
+  static var isAuthorized: Future<Bool, Never> {
+    Future { resolve in
+      Self.fetchAuthorizationStatus { status in
+        resolve(.success(status))
+      }
+    }
+  }
+  
   static func fetchAuthorizationStatus(callback: @escaping (Bool) -> Void) {
     // Fetch the current status.
     let currentlyAuthorized = authorizationStatus() == .authorized
@@ -43,7 +51,7 @@ extension PHPhotoLibrary {
     
     // Otherwise request access and callback with the new status.
     requestAuthorization { newStatus in
-      callback(newStatus == .authorized)
+      callback(newStatus == .authorized) 
     }
   }
 }
