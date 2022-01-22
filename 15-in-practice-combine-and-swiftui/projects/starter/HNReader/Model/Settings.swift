@@ -26,10 +26,25 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 
+import Combine
 import Foundation
 
-final class Settings {
-  init() { }
-  
-  var keywords = [FilterKeyword]()
+final class Settings: ObservableObject {
+    @Published var keywords = [FilterKeyword]() {
+        didSet {
+            do {
+                try JSONFile.save(value: keywords, named: "keywords")
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
+    }
+    
+    init() {
+        do {
+            keywords = try JSONFile.loadValue(named: "keywords")
+        } catch {
+            print(error.localizedDescription)
+        }
+    }
 }

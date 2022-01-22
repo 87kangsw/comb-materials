@@ -26,25 +26,48 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 
+import Combine
 import Foundation
 
-class ReaderViewModel {
-  private let api = API()
-  private var allStories = [Story]()
-
-  var filter = [String]()
-  
-  var stories: [Story] {
-    guard !filter.isEmpty else {
-      return allStories
-    }
-    return allStories
-      .filter { story -> Bool in
-        return filter.reduce(false) { isMatch, keyword -> Bool in
-          return isMatch || story.title.lowercased().contains(keyword)
+class ReaderViewModel: ObservableObject {
+    private let api = API()
+    @Published private var allStories = [Story]() {
+        didSet {
+            print(allStories.count)
         }
-      }
-  }
-  
-  var error: API.Error? = nil
+    }
+    
+    @Published var filter = [String]()
+    
+    var stories: [Story] {
+        guard !filter.isEmpty else {
+            return allStories
+        }
+        return allStories
+            .filter { story -> Bool in
+                return filter.reduce(false) { isMatch, keyword -> Bool in
+                    return isMatch || story.title.lowercased().contains(keyword)
+                }
+            }
+    }
+    
+    @Published var error: API.Error? = nil
+    
+    private var subscriptions = Set<AnyCancellable>()
+    
+    func fetchStories() {
+        api
+            .stories()
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case .failure(let error) = completion {
+                    self.error = error
+                }
+            } receiveValue: { stories in
+                self.allStories = stories
+                self.error = nil
+            }
+            .store(in: &subscriptions)
+
+    }
 }

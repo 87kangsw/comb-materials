@@ -44,12 +44,13 @@ fileprivate struct SettingsBarItems: View {
 struct SettingsView: View {
   
   @State var presentingAddKeywordSheet = false
+    @EnvironmentObject var settings: Settings
   
   var body: some View {
     NavigationView {
       List {
         Section(header: Text("Filter keywords")) {
-          ForEach([FilterKeyword]()) { keyword in
+            ForEach(settings.keywords) { keyword in
             HStack(alignment: .top) {
               Image(systemName: "star")
                 .resizable()
@@ -60,12 +61,16 @@ struct SettingsView: View {
               Text(keyword.value)
             }
           }
-          // List editing actions
+            // List editing actions
+            .onDelete(perform: deleteKeyword(at:))
+            .onMove(perform: moveKeyword(from:to:))
         }
       }
       .sheet(isPresented: $presentingAddKeywordSheet) {
         AddKeywordView(completed: { newKeyword in
-          
+            let new  = FilterKeyword(value: newKeyword.lowercased())
+            self.settings.keywords.append(new)
+            self.presentingAddKeywordSheet = false
         })
         .frame(minHeight: 0, maxHeight: 400, alignment: .center)
       }
@@ -75,15 +80,18 @@ struct SettingsView: View {
   }
   
   private func addKeyword() {
-    
+    presentingAddKeywordSheet = true
   }
   
   private func moveKeyword(from source: IndexSet, to destination: Int) {
-    
+      guard let source = source.first, destination != settings.keywords.endIndex else { return }
+      
+      settings.keywords
+          .swapAt(source, source > destination ? destination : destination - 1)
   }
   
   private func deleteKeyword(at index: IndexSet) {
-    
+      settings.keywords.remove(at: index.first!)
   }
 }
 
