@@ -4,7 +4,128 @@ import Combine
 
 var subscriptions = Set<AnyCancellable>()
 //: ## try* operators
-<#Add your code here#>
+example(of: "tryMap") {
+    enum NameError: Error {
+        case tooShort(String)
+        case unknown
+    }
+    
+    let names = ["Marin", "Shai", "Florent"].publisher
+    
+    names
+        .tryMap { value -> Int in
+            let length = value.count
+            
+            guard length >= 5 else {
+                throw NameError.tooShort(value)
+            }
+            
+            return length
+        }
+        .sink(receiveCompletion: { print("Completed with \($0)") }, receiveValue: { print("Got value: \($0)") })
+        .store(in: &subscriptions)
+}
+
+example(of: "map vs tryMap") {
+    enum NameError: Error {
+        case tooShort(String)
+        case unknown
+    }
+    
+    Just("Hello")
+        .setFailureType(to: NameError.self)
+        // .tryMap { $0 + " World" }
+        .tryMap { throw NameError.tooShort($0) }
+        .mapError { $0 as? NameError ?? .unknown }
+        .sink { completion in
+            switch completion {
+            case .finished:
+                print("Done!")
+            case .failure(NameError.tooShort(let name)):
+                print("\(name) is too short!")
+            case .failure(NameError.unknown):
+                print("An unknown error occurred")
+            }
+        } receiveValue: { value in
+            print("Got value: \(value)")
+        }
+        .store(in: &subscriptions)
+}
+
+example(of: "Joke API") {
+    class DadJokes {
+        enum Error: Swift.Error, CustomStringConvertible {
+            case network
+            case jokeDoesntExist(id: String)
+            case parsing
+            case unknown
+            
+            var description: String {
+                switch self {
+                case .network:
+                    return "Request to API Server failed"
+                case .jokeDoesntExist(id: let id):
+                    return "Joke with ID \(id) doesn't exist"
+                case .parsing:
+                    return "Failed parsing response from server"
+                case .unknown:
+                    return "An unknown error ocurred"
+                }
+            }
+        }
+        
+        struct Joke: Codable {
+            let id: String
+            let joke: String
+        }
+        
+        func getJoke(id: String) -> AnyPublisher<Joke, Error> {
+            guard id.rangeOfCharacter(from: .letters) != nil else {
+                return Fail<Joke, Error>(error: .jokeDoesntExist(id: id))
+                    .eraseToAnyPublisher()
+            }
+            
+            
+            let url = URL(string: "https://icanhazdadjoke.com/j/\(id)")!
+            var request = URLRequest(url: url)
+            request.allHTTPHeaderFields = ["Accept": "application/json"]
+            
+            return URLSession.shared
+              .dataTaskPublisher(for: request)
+//              .map(\.data)
+              .tryMap { data, _ -> Data in
+                  guard let obj = try? JSONSerialization.jsonObject(with: data), let dict = obj as? [String: Any],
+                        dict["status"] as? Int == 404 else {
+                            return data
+                        }
+                  throw DadJokes.Error.jokeDoesntExist(id: id)
+              }
+              .decode(type: Joke.self, decoder: JSONDecoder())
+              .mapError({ error -> DadJokes.Error in
+                  switch error {
+                  case is URLError:
+                      return .network
+                  case is DecodingError:
+                      return .parsing
+                  default:
+                      return error as? DadJokes.Error ?? .unknown
+                  }
+              })
+              .eraseToAnyPublisher()
+        }
+    }
+    
+    let api = DadJokes()
+    let jokeID = "9prWnjyImyd"
+    let badJokeID = "123456"
+    
+    api
+        .getJoke(id: jokeID)
+        .print()
+        .sink(receiveCompletion: { print($0) }, receiveValue: { print("Got joke: \($0)") })
+        .store(in: &subscriptions)
+}
+
 //: [Next](@next)
 
 /// Copyright (c) 2021 Razeware LLC

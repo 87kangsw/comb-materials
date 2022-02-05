@@ -3,7 +3,79 @@ import Combine
 
 var subscriptions = Set<AnyCancellable>()
 //: ## Never
-<#Add your code here#>
+
+example(of: "Never sink") {
+    Just("Hello")
+        .sink(receiveValue:  { print($0) })
+        .store(in: &subscriptions)
+}
+
+enum MyError: Error {
+    case ohNo
+}
+
+example(of: "setFailureType") {
+    Just("Hello")
+        .setFailureType(to: MyError.self)
+        .sink(receiveCompletion: { completion in
+            switch completion {
+            case .failure(.ohNo):
+                print("Finished with Oh No!")
+            case .finished:
+                print("Finished successfully!")
+            }
+        }, receiveValue: { value in
+            print("Got value: \(value)")
+        })
+        .store(in: &subscriptions)
+}
+
+example(of: "assign(to:on:)") {
+    class Person {
+        let id = UUID()
+        var name: String = "Unknown"
+    }
+    
+    let person = Person()
+    print("1", person.name)
+    
+    Just("Shai")
+        // .setFailureType(to: Error.self)
+        .handleEvents(receiveCompletion: { _ in
+            print("2", person.name)
+        })
+        .assign(to: \.name, on: person)
+        .store(in: &subscriptions)
+}
+
+example(of: "assign(to:)") {
+    class MyViewModel: ObservableObject {
+        @Published var currentDate: Date = Date()
+        
+        init() {
+            Timer.publish(every: 1.0, on: .main, in: .common)
+                .autoconnect()
+                .prefix(3)
+                // .assign(to: \.currentDate, on: self)
+                .assign(to: &$currentDate)
+//                .store(in: &subscriptions)
+        }
+    }
+    
+    let vm = MyViewModel()
+    vm.$currentDate
+        .sink(receiveValue: { print($0) })
+        .store(in: &subscriptions)
+}
+
+example(of: "assertNoFailure") {
+    Just("Hello")
+        .setFailureType(to: MyError.self)
+        // .tryMap { _ in throw MyError.ohNo }
+        .assertNoFailure() //
+        .sink(receiveValue: { print("Got value: \($0)") })
+        .store(in: &subscriptions)
+}
 //: [Next](@next)
 
 /// Copyright (c) 2021 Razeware LLC
